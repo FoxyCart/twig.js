@@ -29,6 +29,11 @@ describe("Twig.js Control Structures ->", function() {
             test_template.render({test: false, test2: true}).should.equal("not" );
             test_template.render({test: false, test2: false}).should.equal("not" );
         });
+        it("should support newlines in if statement", function() {
+            var test_template = twig({data: '{% if test or\r\nother %}true{% endif%}'});
+            test_template.render({test: true, other: false}).should.equal("true" );
+            test_template.render({test: false, other: false}).should.equal("" );
+        });
     });
 
     // {% for ... %}
@@ -121,9 +126,19 @@ describe("Twig.js Control Structures ->", function() {
 
     // {% set thing='value' %}
     describe("set tag ->", function() {
-        it("should set the global context from within a for loop", function() {
-            var test_template = twig({data: '{% set value="wrong" %}{% for value in [1] %}{% set value="right" %}{% endfor %}{{value}}'});
+        it("should not set the global context from within a for loop", function() {
+            var test_template = twig({data: '{% for value in [1] %}{% set foo="right" %}{% endfor %}{{ foo }}'});
+            test_template.render().should.equal("");
+        });
+
+        it("should set the global context from within a for loop when the variable is initialized outside of the loop", function() {
+            var test_template = twig({data: '{% set foo="wrong" %}{% for value in [1] %}{% set foo="right" %}{% endfor %}{{ foo }}'});
             test_template.render().should.equal("right");
+        });
+
+        it("should set the global context from within a nested for loop when the variable is initialized outside of the loop", function() {
+            var test_template = twig({data: '{% set k = 0 %}{% for i in 0..2 %}{% for j in 0..2 %}{{ k }}{% set k = k + 1 %}{% endfor %}{% endfor %}'});
+            test_template.render().should.equal("012345678");
         });
     });
 });

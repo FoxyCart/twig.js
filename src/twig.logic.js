@@ -74,7 +74,7 @@ var Twig = (function (Twig) {
              *  Format: {% if expression %}
              */
             type: Twig.logic.type.if_,
-            regex: /^if\s+([^\s].+)$/,
+            regex: /^if\s+([\s\S]+)$/,
             next: [
                 Twig.logic.type.else_,
                 Twig.logic.type.elseif,
@@ -243,8 +243,8 @@ var Twig = (function (Twig) {
                 // Parse expression
                 var result = Twig.expression.parse.apply(this, [token.expression, context]),
                     output = [],
-					len,
-					index = 0,
+                    len,
+                    index = 0,
                     keyset,
                     that = this,
                     conditional = token.conditional,
@@ -261,10 +261,12 @@ var Twig = (function (Twig) {
                             parent: context
                         };
                     },
+                    // run once for each iteration of the loop
                     loop = function(key, value) {
-                        var inner_context = Twig.lib.copy(context);
+                        var inner_context = context._twig_create();
 
                         inner_context[token.value_var] = value;
+
                         if (token.key_var) {
                             inner_context[token.key_var] = key;
                         }
@@ -278,7 +280,17 @@ var Twig = (function (Twig) {
                             output.push(Twig.parse.apply(that, [token.output, inner_context]));
                             index += 1;
                         }
+
+                        // Delete loop-related variables from the context
+                        delete inner_context['loop'];
+                        delete inner_context[token.value_var];
+                        delete inner_context[token.key_var];
+
+                        // Merge in values that exist in context but have changed 
+                        // in inner_context.
+                        context._twig_merge(inner_context, true);
                     };
+
 
                 if (result instanceof Array) {
                     len = result.length;
@@ -329,7 +341,7 @@ var Twig = (function (Twig) {
              *  Format: {% set key = expression %}
              */
             type: Twig.logic.type.set,
-            regex: /^set\s+([a-zA-Z0-9_,\s]+)\s*=\s*(.+)$/,
+            regex: /^set\s+([a-zA-Z0-9_,\s]+)\s*=\s*([\s\S]+)$/,
             next: [ ],
             open: true,
             compile: function (token) {
@@ -351,8 +363,6 @@ var Twig = (function (Twig) {
                 var value = Twig.expression.parse.apply(this, [token.expression, context]),
                     key = token.key;
 
-                // set on both the global and local context
-                this.context[key] = value;
                 context[key] = value;
 
                 return {
@@ -488,11 +498,11 @@ var Twig = (function (Twig) {
 
                     if (isImported) {
                         // once the block is overridden, remove it from the list of imported blocks
-                        this.importedBlocks.splice(this.importedBlocks.indexOf(token.block));
+                        this.importedBlocks.splice(this.importedBlocks.indexOf(token.block), 1);
                     }
 
                     if (hasParent) {
-                        this.blocks[token.block] =  this.blocks[token.block].replace(Twig.placeholders.parent, block_output);
+                        this.blocks[token.block] = Twig.Markup(this.blocks[token.block].replace(Twig.placeholders.parent, block_output));
                     } else {
                         this.blocks[token.block] = block_output;
                     }
@@ -597,7 +607,7 @@ var Twig = (function (Twig) {
              *  Format: {% includes "template.twig" [with {some: 'values'} only] %}
              */
             type: Twig.logic.type.include,
-            regex: /^include\s+(ignore missing\s+)?(.+?)\s*(?:with\s+(.+?))?\s*(only)?$/,
+            regex: /^include\s+(ignore missing\s+)?(.+?)\s*(?:with\s+([\S\s]+?))?\s*(only)?$/,
             next: [ ],
             open: true,
             compile: function (token) {

@@ -71,6 +71,9 @@ describe("Twig.js Core ->", function() {
         twig({data: '{{ "dou\\"ble" }}'}).render().should.equal("dou\"ble");
         twig({data: "{{ 'sin\\'gle' }}"}).render().should.equal("sin'gle");
     });
+    it("should be able to output strings with newlines", function() {
+        twig({data: "{{ 'a\nb\rc\r\nd' }}"}).render().should.equal("a\nb\rc\r\nd");
+    });
     it("should be able to output arrays", function() {
          twig({data: '{{ [1] }}'}).render().should.equal("1" );
          twig({data: '{{ [1,2 ,3 ] }}'}).render().should.equal("1,2,3" );
@@ -103,6 +106,10 @@ describe("Twig.js Core ->", function() {
 
     it("should recognize object literals", function() {
         twig({data: '{% set at = {"foo": "test", bar: "other", 1:"zip"} %}{{ at.foo ~ at.bar ~ at.1 }}'}).render().should.equal( "testotherzip" );
+    });
+
+    it("should allow newlines in object literals", function() {
+        twig({data: '{% set at = {\n"foo": "test",\rbar: "other",\r\n1:"zip"\n} %}{{ at.foo ~ at.bar ~ at.1 }}'}).render().should.equal( "testotherzip" );
     });
 
     it("should recognize null in an object", function() {
@@ -267,6 +274,25 @@ describe("Twig.js Core ->", function() {
             }).render({
                 value: "<test>&</test>"
             }).should.equal('&lt;test&gt;&amp;&lt;/test&gt;');
+        });
+
+        it("should autoescape parent() output correctly", function() {
+            twig({id: 'parent1', data: '{% block body %}<p>{{ value }}</p>{% endblock body %}'});
+            twig({
+                allowInlineIncludes: true,
+                autoescape: true,
+                data: '{% extends "parent1" %}{% block body %}{{ parent() }}{% endblock %}'
+            }).render({
+                value: "<test>&</test>"
+            }).should.equal('<p>&lt;test&gt;&amp;&lt;/test&gt;</p>');
+        });
+
+        it("should use a correct context in the extended template", function() {
+            twig({id: 'parent', data: '{% block body %}{{ value }}{% endblock body %}'});
+            twig({
+                allowInlineIncludes: true,
+                data: '{% extends "parent" %}{% set value = "test" %}{% block body %}{{ parent() }}{% endblock %}'
+            }).render().should.equal("test");
         });
     });
 });
