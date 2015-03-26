@@ -8,7 +8,7 @@
 
 var Twig = (function (Twig) {
 
-    Twig.VERSION = "0.7.2-6";
+    Twig.VERSION = "0.7.2-7";
 
     return Twig;
 })(Twig || {});
