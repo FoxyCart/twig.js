@@ -8,7 +8,7 @@
 
 var Twig = (function (Twig) {
 
-    Twig.VERSION = "0.7.2-6";
+    Twig.VERSION = "0.7.2-7";
 
     return Twig;
 })(Twig || {});
@@ -2582,10 +2582,7 @@ var Twig = (function (Twig) {
                     template;
 
                 if (!token.only) {
-                    for (i in context) {
-                        if (context.hasOwnProperty(i))
-                            innerContext[i] = context[i];
-                    }
+                    innerContext = Twig.ChildContext(context);
                 }
 
                 if (token.withStack !== undefined) {
