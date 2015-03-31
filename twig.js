@@ -1,19 +1,18 @@
 /**
- * Twig.js 0.7.2
+ * Twig.js 0.8.2
  *
- * @copyright 2011-2013 John Roepke
+ * @copyright 2011-2015 John Roepke and the Twig.js Contributors
  * @license   Available under the BSD 2-Clause License
  * @link      https://github.com/justjohn/twig.js
  */
 
 var Twig = (function (Twig) {
 
-    Twig.VERSION = "0.7.2-7";
+    Twig.VERSION = "0.8.2";
 
     return Twig;
 })(Twig || {});
 //     Twig.js
-//     Copyright (c) 2011-2013 John Roepke
 //     Available under the BSD 2-Clause License
 //     https://github.com/justjohn/twig.js
 
@@ -1937,7 +1936,6 @@ var Twig = (function(Twig) {
 
 })(Twig || { });
 //     Twig.js
-//     Copyright (c) 2011-2013 John Roepke
 //     Available under the BSD 2-Clause License
 //     https://github.com/justjohn/twig.js
 
@@ -2648,14 +2646,14 @@ var Twig = (function (Twig) {
              *
              */
             type: Twig.logic.type.macro,
-            regex: /^macro\s+([a-zA-Z0-9_]+)\s?\((([a-zA-Z0-9_]+(,\s?)?)*)\)$/,
+            regex: /^macro\s+([a-zA-Z0-9_]+)\s*\(\s*((?:[a-zA-Z0-9_]+(?:,\s*)?)*)\s*\)$/,
             next: [
                 Twig.logic.type.endmacro
             ],
             open: true,
             compile: function (token) {
                 var macroName = token.match[1],
-                    parameters = token.match[2].split(/[ ,]+/);
+                    parameters = token.match[2].split(/[\s,]+/);
 
                 //TODO: Clean up duplicate check
                 for (var i=0; i<parameters.length; i++) {
@@ -3083,7 +3081,6 @@ var Twig = (function (Twig) {
 
 })(Twig || { });
 //     Twig.js
-//     Copyright (c) 2011-2013 John Roepke
 //     Available under the BSD 2-Clause License
 //     https://github.com/justjohn/twig.js
 
@@ -4078,7 +4075,6 @@ var Twig = (function (Twig) {
 
 })( Twig || { } );
 //     Twig.js
-//     Copyright (c) 2011-2013 John Roepke
 //     Available under the BSD 2-Clause License
 //     https://github.com/justjohn/twig.js
 
@@ -4356,7 +4352,6 @@ var Twig = (function (Twig) {
 
 })( Twig || { } );
 //     Twig.js
-//     Copyright (c) 2011-2013 John Roepke
 //     Available under the BSD 2-Clause License
 //     https://github.com/justjohn/twig.js
 
@@ -4969,7 +4964,6 @@ var Twig = (function (Twig) {
 
 })(Twig || { });
 //     Twig.js
-//     Copyright (c) 2011-2013 John Roepke
 //                   2012 Hadrien Lanneau
 //     Available under the BSD 2-Clause License
 //     https://github.com/justjohn/twig.js
@@ -5196,7 +5190,6 @@ var Twig = (function (Twig) {
 
 })(Twig || { });
 //     Twig.js
-//     Copyright (c) 2011-2013 John Roepke
 //     Available under the BSD 2-Clause License
 //     https://github.com/justjohn/twig.js
 
@@ -5261,7 +5254,6 @@ var Twig = (function (Twig) {
     return Twig;
 })( Twig || { } );
 //     Twig.js
-//     Copyright (c) 2011-2013 John Roepke
 //     Available under the BSD 2-Clause License
 //     https://github.com/justjohn/twig.js
 
@@ -5453,7 +5445,6 @@ var Twig = (function (Twig) {
 }) (Twig || { });
 
 //     Twig.js
-//     Copyright (c) 2011-2013 John Roepke
 //     Available under the BSD 2-Clause License
 //     https://github.com/justjohn/twig.js
 
@@ -5509,7 +5500,6 @@ var Twig = (function (Twig) {
     return Twig;
 })(Twig || {});
 //     Twig.js
-//     Copyright (c) 2011-2013 John Roepke
 //     Available under the BSD 2-Clause License
 //     https://github.com/justjohn/twig.js
 

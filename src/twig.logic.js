@@ -1,5 +1,4 @@
 //     Twig.js
-//     Copyright (c) 2011-2013 John Roepke
 //     Available under the BSD 2-Clause License
 //     https://github.com/justjohn/twig.js
 
@@ -710,14 +709,14 @@ var Twig = (function (Twig) {
              *
              */
             type: Twig.logic.type.macro,
-            regex: /^macro\s+([a-zA-Z0-9_]+)\s?\((([a-zA-Z0-9_]+(,\s?)?)*)\)$/,
+            regex: /^macro\s+([a-zA-Z0-9_]+)\s*\(\s*((?:[a-zA-Z0-9_]+(?:,\s*)?)*)\s*\)$/,
             next: [
                 Twig.logic.type.endmacro
             ],
             open: true,
             compile: function (token) {
                 var macroName = token.match[1],
-                    parameters = token.match[2].split(/[ ,]+/);
+                    parameters = token.match[2].split(/[\s,]+/);
 
                 //TODO: Clean up duplicate check
                 for (var i=0; i<parameters.length; i++) {
