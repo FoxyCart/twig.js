@@ -1,5 +1,5 @@
 /**
- * Twig.js 0.8.2
+ * Twig.js 0.8.2-1
  *
  * @copyright 2011-2015 John Roepke and the Twig.js Contributors
  * @license   Available under the BSD 2-Clause License
@@ -8,7 +8,7 @@
 
 var Twig = (function (Twig) {
 
-    Twig.VERSION = "0.8.2";
+    Twig.VERSION = "0.8.2-1";
 
     return Twig;
 })(Twig || {});
@@ -218,6 +218,11 @@ var Twig = (function (Twig) {
             type: Twig.token.type.raw,
             open: '{% raw %}',
             close: '{% endraw %}'
+        },
+        {
+            type: Twig.token.type.raw,
+            open: '{% verbatim %}',
+            close: '{% endverbatim %}'
         },
         // *Output type tokens*
         //
@@ -1158,158 +1163,207 @@ var Twig = (function(Twig) {
     Twig.lib = { };
 
     /**
-    sprintf() for JavaScript 0.7-beta1
-    http://www.diveintojavascript.com/projects/javascript-sprintf
+    sprintf() for JavaScript 1.0.3
+    https://github.com/alexei/sprintf.js
     **/
-    var sprintf = (function() {
-            function get_type(variable) {
-                    return Object.prototype.toString.call(variable).slice(8, -1).toLowerCase();
+    var sprintfLib = (function() {
+        var re = {
+            not_string: /[^s]/,
+            number: /[diefg]/,
+            json: /[j]/,
+            not_json: /[^j]/,
+            text: /^[^\x25]+/,
+            modulo: /^\x25{2}/,
+            placeholder: /^\x25(?:([1-9]\d*)\$|\(([^\)]+)\))?(\+)?(0|'[^$])?(-)?(\d+)?(?:\.(\d+))?([b-gijosuxX])/,
+            key: /^([a-z_][a-z_\d]*)/i,
+            key_access: /^\.([a-z_][a-z_\d]*)/i,
+            index_access: /^\[(\d+)\]/,
+            sign: /^[\+\-]/
+        }
+
+        function sprintf() {
+            var key = arguments[0], cache = sprintf.cache
+            if (!(cache[key] && cache.hasOwnProperty(key))) {
+                cache[key] = sprintf.parse(key)
             }
-            function str_repeat(input, multiplier) {
-                    for (var output = []; multiplier > 0; output[--multiplier] = input) {/* do nothing */}
-                    return output.join('');
+            return sprintf.format.call(null, cache[key], arguments)
+        }
+
+        sprintf.format = function(parse_tree, argv) {
+            var cursor = 1, tree_length = parse_tree.length, node_type = "", arg, output = [], i, k, match, pad, pad_character, pad_length, is_positive = true, sign = ""
+            for (i = 0; i < tree_length; i++) {
+                node_type = get_type(parse_tree[i])
+                if (node_type === "string") {
+                    output[output.length] = parse_tree[i]
+                }
+                else if (node_type === "array") {
+                    match = parse_tree[i] // convenience purposes only
+                    if (match[2]) { // keyword argument
+                        arg = argv[cursor]
+                        for (k = 0; k < match[2].length; k++) {
+                            if (!arg.hasOwnProperty(match[2][k])) {
+                                throw new Error(sprintf("[sprintf] property '%s' does not exist", match[2][k]))
+                            }
+                            arg = arg[match[2][k]]
+                        }
+                    }
+                    else if (match[1]) { // positional argument (explicit)
+                        arg = argv[match[1]]
+                    }
+                    else { // positional argument (implicit)
+                        arg = argv[cursor++]
+                    }
+
+                    if (get_type(arg) == "function") {
+                        arg = arg()
+                    }
+
+                    if (re.not_string.test(match[8]) && re.not_json.test(match[8]) && (get_type(arg) != "number" && isNaN(arg))) {
+                        throw new TypeError(sprintf("[sprintf] expecting number but found %s", get_type(arg)))
+                    }
+
+                    if (re.number.test(match[8])) {
+                        is_positive = arg >= 0
+                    }
+
+                    switch (match[8]) {
+                        case "b":
+                            arg = arg.toString(2)
+                            break
+                        case "c":
+                            arg = String.fromCharCode(arg)
+                            break
+                        case "d":
+                        case "i":
+                            arg = parseInt(arg, 10)
+                            break
+                        case "j":
+                            arg = JSON.stringify(arg, null, match[6] ? parseInt(match[6]) : 0)
+                            break
+                        case "e":
+                            arg = match[7] ? arg.toExponential(match[7]) : arg.toExponential()
+                            break
+                        case "f":
+                            arg = match[7] ? parseFloat(arg).toFixed(match[7]) : parseFloat(arg)
+                            break
+                        case "g":
+                            arg = match[7] ? parseFloat(arg).toPrecision(match[7]) : parseFloat(arg)
+                            break
+                        case "o":
+                            arg = arg.toString(8)
+                            break
+                        case "s":
+                            arg = ((arg = String(arg)) && match[7] ? arg.substring(0, match[7]) : arg)
+                            break
+                        case "u":
+                            arg = arg >>> 0
+                            break
+                        case "x":
+                            arg = arg.toString(16)
+                            break
+                        case "X":
+                            arg = arg.toString(16).toUpperCase()
+                            break
+                    }
+                    if (re.json.test(match[8])) {
+                        output[output.length] = arg
+                    }
+                    else {
+                        if (re.number.test(match[8]) && (!is_positive || match[3])) {
+                            sign = is_positive ? "+" : "-"
+                            arg = arg.toString().replace(re.sign, "")
+                        }
+                        else {
+                            sign = ""
+                        }
+                        pad_character = match[4] ? match[4] === "0" ? "0" : match[4].charAt(1) : " "
+                        pad_length = match[6] - (sign + arg).length
+                        pad = match[6] ? (pad_length > 0 ? str_repeat(pad_character, pad_length) : "") : ""
+                        output[output.length] = match[5] ? sign + arg + pad : (pad_character === "0" ? sign + pad + arg : pad + sign + arg)
+                    }
+                }
             }
+            return output.join("")
+        }
 
-            var str_format = function() {
-                    if (!str_format.cache.hasOwnProperty(arguments[0])) {
-                            str_format.cache[arguments[0]] = str_format.parse(arguments[0]);
+        sprintf.cache = {}
+
+        sprintf.parse = function(fmt) {
+            var _fmt = fmt, match = [], parse_tree = [], arg_names = 0
+            while (_fmt) {
+                if ((match = re.text.exec(_fmt)) !== null) {
+                    parse_tree[parse_tree.length] = match[0]
+                }
+                else if ((match = re.modulo.exec(_fmt)) !== null) {
+                    parse_tree[parse_tree.length] = "%"
+                }
+                else if ((match = re.placeholder.exec(_fmt)) !== null) {
+                    if (match[2]) {
+                        arg_names |= 1
+                        var field_list = [], replacement_field = match[2], field_match = []
+                        if ((field_match = re.key.exec(replacement_field)) !== null) {
+                            field_list[field_list.length] = field_match[1]
+                            while ((replacement_field = replacement_field.substring(field_match[0].length)) !== "") {
+                                if ((field_match = re.key_access.exec(replacement_field)) !== null) {
+                                    field_list[field_list.length] = field_match[1]
+                                }
+                                else if ((field_match = re.index_access.exec(replacement_field)) !== null) {
+                                    field_list[field_list.length] = field_match[1]
+                                }
+                                else {
+                                    throw new SyntaxError("[sprintf] failed to parse named argument key")
+                                }
+                            }
+                        }
+                        else {
+                            throw new SyntaxError("[sprintf] failed to parse named argument key")
+                        }
+                        match[2] = field_list
                     }
-                    return str_format.format.call(null, str_format.cache[arguments[0]], arguments);
-            };
-
-            str_format.format = function(parse_tree, argv) {
-                    var cursor = 1, tree_length = parse_tree.length, node_type = '', arg, output = [], i, k, match, pad, pad_character, pad_length;
-                    for (i = 0; i < tree_length; i++) {
-                            node_type = get_type(parse_tree[i]);
-                            if (node_type === 'string') {
-                                    output.push(parse_tree[i]);
-                            }
-                            else if (node_type === 'array') {
-                                    match = parse_tree[i]; // convenience purposes only
-                                    if (match[2]) { // keyword argument
-                                            arg = argv[cursor];
-                                            for (k = 0; k < match[2].length; k++) {
-                                                    if (!arg.hasOwnProperty(match[2][k])) {
-                                                            throw(sprintf('[sprintf] property "%s" does not exist', match[2][k]));
-                                                    }
-                                                    arg = arg[match[2][k]];
-                                            }
-                                    }
-                                    else if (match[1]) { // positional argument (explicit)
-                                            arg = argv[match[1]];
-                                    }
-                                    else { // positional argument (implicit)
-                                            arg = argv[cursor++];
-                                    }
-
-                                    if (/[^s]/.test(match[8]) && (get_type(arg) != 'number')) {
-                                            throw(sprintf('[sprintf] expecting number but found %s', get_type(arg)));
-                                    }
-                                    switch (match[8]) {
-                                            case 'b': arg = arg.toString(2); break;
-                                            case 'c': arg = String.fromCharCode(arg); break;
-                                            case 'd': arg = parseInt(arg, 10); break;
-                                            case 'e': arg = match[7] ? arg.toExponential(match[7]) : arg.toExponential(); break;
-                                            case 'f': arg = match[7] ? parseFloat(arg).toFixed(match[7]) : parseFloat(arg); break;
-                                            case 'o': arg = arg.toString(8); break;
-                                            case 's': arg = ((arg = String(arg)) && match[7] ? arg.substring(0, match[7]) : arg); break;
-                                            case 'u': arg = Math.abs(arg); break;
-                                            case 'x': arg = arg.toString(16); break;
-                                            case 'X': arg = arg.toString(16).toUpperCase(); break;
-                                    }
-
-                                    var sign = '';
-                                    if (/[def]/.test(match[8])) {
-                                        if (match[3]) {
-                                            sign = arg >= 0 ? '+' : '-';
-                                        } else {
-                                            sign = arg >= 0 ? '' : '-';
-                                        }
-                                        arg = Math.abs(arg);
-                                    }
-
-                                    pad_character = match[4] ? match[4] == '0' ? '0' : match[4].charAt(1) : ' ';
-                                    pad_length = match[6] - String(arg).length - sign.length;
-                                    pad = match[6] ? str_repeat(pad_character, pad_length) : '';
-
-                                    if (match[5]) {
-                                        // trailing padding
-                                        output.push(sign);
-                                        output.push(arg);
-                                        output.push(pad);
-                                    } else if ('0' == pad_character) {
-                                        // leading zero padding
-                                        output.push(sign);
-                                        output.push(pad);
-                                        output.push(arg);
-                                    } else {
-                                        // leading padding
-                                        output.push(pad);
-                                        output.push(sign);
-                                        output.push(arg);
-                                    }
-                            }
+                    else {
+                        arg_names |= 2
                     }
-                    return output.join('');
-            };
-
-            str_format.cache = {};
-
-            str_format.parse = function(fmt) {
-                    var _fmt = fmt, match = [], parse_tree = [], arg_names = 0;
-                    while (_fmt) {
-                            if ((match = /^[^\x25]+/.exec(_fmt)) !== null) {
-                                    parse_tree.push(match[0]);
-                            }
-                            else if ((match = /^\x25{2}/.exec(_fmt)) !== null) {
-                                    parse_tree.push('%');
-                            }
-                            else if ((match = /^\x25(?:([1-9]\d*)\$|\(([^\)]+)\))?(\+)?(0|'[^$])?(-)?(\d+)?(?:\.(\d+))?([b-fosuxX])/.exec(_fmt)) !== null) {
-                                    if (match[2]) {
-                                            arg_names |= 1;
-                                            var field_list = [], replacement_field = match[2], field_match = [];
-                                            if ((field_match = /^([a-z_][a-z_\d]*)/i.exec(replacement_field)) !== null) {
-                                                    field_list.push(field_match[1]);
-                                                    while ((replacement_field = replacement_field.substring(field_match[0].length)) !== '') {
-                                                            if ((field_match = /^\.([a-z_][a-z_\d]*)/i.exec(replacement_field)) !== null) {
-                                                                    field_list.push(field_match[1]);
-                                                            }
-                                                            else if ((field_match = /^\[(\d+)\]/.exec(replacement_field)) !== null) {
-                                                                    field_list.push(field_match[1]);
-                                                            }
-                                                            else {
-                                                                    throw('[sprintf] huh?');
-                                                            }
-                                                    }
-                                            }
-                                            else {
-                                                    throw('[sprintf] huh?');
-                                            }
-                                            match[2] = field_list;
-                                    }
-                                    else {
-                                            arg_names |= 2;
-                                    }
-                                    if (arg_names === 3) {
-                                            throw('[sprintf] mixing positional and named placeholders is not (yet) supported');
-                                    }
-                                    parse_tree.push(match);
-                            }
-                            else {
-                                    throw('[sprintf] huh?');
-                            }
-                            _fmt = _fmt.substring(match[0].length);
+                    if (arg_names === 3) {
+                        throw new Error("[sprintf] mixing positional and named placeholders is not (yet) supported")
                     }
-                    return parse_tree;
-            };
+                    parse_tree[parse_tree.length] = match
+                }
+                else {
+                    throw new SyntaxError("[sprintf] unexpected placeholder")
+                }
+                _fmt = _fmt.substring(match[0].length)
+            }
+            return parse_tree
+        }
 
-            return str_format;
+        var vsprintf = function(fmt, argv, _argv) {
+            _argv = (argv || []).slice(0)
+            _argv.splice(0, 0, fmt)
+            return sprintf.apply(null, _argv)
+        }
+
+        /**
+         * helpers
+         */
+        function get_type(variable) {
+            return Object.prototype.toString.call(variable).slice(8, -1).toLowerCase()
+        }
+
+        function str_repeat(input, multiplier) {
+            return Array(multiplier + 1).join(input)
+        }
+
+        /**
+         * export
+         */
+        return {
+            sprintf: sprintf,
+            vsprintf: vsprintf
+        }
     })();
 
-    var vsprintf = function(fmt, argv) {
-        argv.unshift(fmt);
-        return sprintf.apply(null, argv);
-    };
+    var sprintf = sprintfLib.sprintf;
+    var vsprintf = sprintfLib.vsprintf;
 
     // Expose to Twig
     Twig.lib.sprintf = sprintf;
@@ -1930,7 +1984,231 @@ var Twig = (function(Twig) {
         }
 
         return (isHalf ? value : Math.round(value)) / m;
-    }
+    };
+
+    Twig.lib.max = function max() {
+        //  discuss at: http://phpjs.org/functions/max/
+        // original by: Onno Marsman
+        //  revised by: Onno Marsman
+        // improved by: Jack
+        //        note: Long code cause we're aiming for maximum PHP compatibility
+        //   example 1: max(1, 3, 5, 6, 7);
+        //   returns 1: 7
+        //   example 2: max([2, 4, 5]);
+        //   returns 2: 5
+        //   example 3: max(0, 'hello');
+        //   returns 3: 0
+        //   example 4: max('hello', 0);
+        //   returns 4: 'hello'
+        //   example 5: max(-1, 'hello');
+        //   returns 5: 'hello'
+        //   example 6: max([2, 4, 8], [2, 5, 7]);
+        //   returns 6: [2, 5, 7]
+
+        var ar, retVal, i = 0,
+            n = 0,
+            argv = arguments,
+            argc = argv.length,
+            _obj2Array = function(obj) {
+                if (Object.prototype.toString.call(obj) === '[object Array]') {
+                    return obj;
+                } else {
+                    var ar = [];
+                    for (var i in obj) {
+                        if (obj.hasOwnProperty(i)) {
+                            ar.push(obj[i]);
+                        }
+                    }
+                    return ar;
+                }
+            }, //function _obj2Array
+            _compare = function(current, next) {
+                var i = 0,
+                    n = 0,
+                    tmp = 0,
+                    nl = 0,
+                    cl = 0;
+
+                if (current === next) {
+                    return 0;
+                } else if (typeof current === 'object') {
+                    if (typeof next === 'object') {
+                        current = _obj2Array(current);
+                        next = _obj2Array(next);
+                        cl = current.length;
+                        nl = next.length;
+                        if (nl > cl) {
+                            return 1;
+                        } else if (nl < cl) {
+                            return -1;
+                        }
+                        for (i = 0, n = cl; i < n; ++i) {
+                            tmp = _compare(current[i], next[i]);
+                            if (tmp == 1) {
+                                return 1;
+                            } else if (tmp == -1) {
+                                return -1;
+                            }
+                        }
+                        return 0;
+                    }
+                    return -1;
+                } else if (typeof next === 'object') {
+                    return 1;
+                } else if (isNaN(next) && !isNaN(current)) {
+                    if (current == 0) {
+                        return 0;
+                    }
+                    return (current < 0 ? 1 : -1);
+                } else if (isNaN(current) && !isNaN(next)) {
+                    if (next == 0) {
+                        return 0;
+                    }
+                    return (next > 0 ? 1 : -1);
+                }
+
+                if (next == current) {
+                    return 0;
+                }
+                return (next > current ? 1 : -1);
+            }; //function _compare
+        if (argc === 0) {
+            throw new Error('At least one value should be passed to max()');
+        } else if (argc === 1) {
+            if (typeof argv[0] === 'object') {
+                ar = _obj2Array(argv[0]);
+            } else {
+                throw new Error('Wrong parameter count for max()');
+            }
+            if (ar.length === 0) {
+                throw new Error('Array must contain at least one element for max()');
+            }
+        } else {
+            ar = argv;
+        }
+
+        retVal = ar[0];
+        for (i = 1, n = ar.length; i < n; ++i) {
+            if (_compare(retVal, ar[i]) == 1) {
+                retVal = ar[i];
+            }
+        }
+
+        return retVal;
+    };
+
+    Twig.lib.min = function min() {
+        //  discuss at: http://phpjs.org/functions/min/
+        // original by: Onno Marsman
+        //  revised by: Onno Marsman
+        // improved by: Jack
+        //        note: Long code cause we're aiming for maximum PHP compatibility
+        //   example 1: min(1, 3, 5, 6, 7);
+        //   returns 1: 1
+        //   example 2: min([2, 4, 5]);
+        //   returns 2: 2
+        //   example 3: min(0, 'hello');
+        //   returns 3: 0
+        //   example 4: min('hello', 0);
+        //   returns 4: 'hello'
+        //   example 5: min(-1, 'hello');
+        //   returns 5: -1
+        //   example 6: min([2, 4, 8], [2, 5, 7]);
+        //   returns 6: [2, 4, 8]
+
+        var ar, retVal, i = 0,
+            n = 0,
+            argv = arguments,
+            argc = argv.length,
+            _obj2Array = function(obj) {
+                if (Object.prototype.toString.call(obj) === '[object Array]') {
+                    return obj;
+                }
+                var ar = [];
+                for (var i in obj) {
+                    if (obj.hasOwnProperty(i)) {
+                        ar.push(obj[i]);
+                    }
+                }
+                return ar;
+            }, //function _obj2Array
+            _compare = function(current, next) {
+                var i = 0,
+                    n = 0,
+                    tmp = 0,
+                    nl = 0,
+                    cl = 0;
+
+                if (current === next) {
+                    return 0;
+                } else if (typeof current === 'object') {
+                    if (typeof next === 'object') {
+                        current = _obj2Array(current);
+                        next = _obj2Array(next);
+                        cl = current.length;
+                        nl = next.length;
+                        if (nl > cl) {
+                            return 1;
+                        } else if (nl < cl) {
+                            return -1;
+                        }
+                        for (i = 0, n = cl; i < n; ++i) {
+                            tmp = _compare(current[i], next[i]);
+                            if (tmp == 1) {
+                                return 1;
+                            } else if (tmp == -1) {
+                                return -1;
+                            }
+                        }
+                        return 0;
+                    }
+                    return -1;
+                } else if (typeof next === 'object') {
+                    return 1;
+                } else if (isNaN(next) && !isNaN(current)) {
+                    if (current == 0) {
+                        return 0;
+                    }
+                    return (current < 0 ? 1 : -1);
+                } else if (isNaN(current) && !isNaN(next)) {
+                    if (next == 0) {
+                        return 0;
+                    }
+                    return (next > 0 ? 1 : -1);
+                }
+
+                if (next == current) {
+                    return 0;
+                }
+                return (next > current ? 1 : -1);
+            }; //function _compare
+
+        if (argc === 0) {
+            throw new Error('At least one value should be passed to min()');
+        } else if (argc === 1) {
+            if (typeof argv[0] === 'object') {
+                ar = _obj2Array(argv[0]);
+            } else {
+                throw new Error('Wrong parameter count for min()');
+            }
+
+            if (ar.length === 0) {
+                throw new Error('Array must contain at least one element for min()');
+            }
+        } else {
+            ar = argv;
+        }
+
+        retVal = ar[0];
+
+        for (i = 1, n = ar.length; i < n; ++i) {
+            if (_compare(retVal, ar[i]) == -1) {
+                retVal = ar[i];
+            }
+        }
+
+        return retVal;
+    };
 
     return Twig;
 
@@ -2228,20 +2506,20 @@ var Twig = (function (Twig) {
                     };
 
 
-                if (result instanceof Array) {
+                if (Twig.lib.is('Array', result)) {
                     len = result.length;
                     Twig.forEach(result, function (value) {
                         var key = index;
 
                         loop(key, value);
                     });
-                } else if (result instanceof Object) {
+                } else if (Twig.lib.is('Object', result)) {
                     if (result._keys !== undefined) {
                         keyset = result._keys;
                     } else {
                         keyset = Object.keys(result);
                     }
-					len = keyset.length;
+                    len = keyset.length;
                     Twig.forEach(keyset, function(key) {
                         // Ignore the _keys property, it's internal to twig.js
                         if (key === "_keys") return;
@@ -2952,10 +3230,6 @@ var Twig = (function (Twig) {
 
         if (!definition.type) {
             throw new Twig.Error("Unable to extend logic definition. No type provided for " + definition);
-        }
-        if (Twig.logic.type[definition.type]) {
-            throw new Twig.Error("Unable to extend logic definitions. Type " +
-                                 definition.type + " is already defined.");
         } else {
             Twig.logic.extendType(definition.type);
         }
@@ -4418,7 +4692,7 @@ var Twig = (function (Twig) {
                 return value.reverse();
             } else if (is("String", value)) {
                 return value.split("").reverse().join("");
-            } else if (value instanceof Object) {
+            } else if (is("Object", value)) {
                 var keys = value._keys || Object.keys(value).reverse();
                 value._keys = keys;
                 return value;
@@ -4427,7 +4701,7 @@ var Twig = (function (Twig) {
         sort: function(value) {
             if (is("Array", value)) {
                 return value.sort();
-            } else if (value instanceof Object) {
+            } else if (is('Object', value)) {
                 // Sorting objects isn't obvious since the order of
                 // returned keys isn't guaranteedin JavaScript.
                 // Because of this we use a "hidden" key called _keys to
@@ -4477,7 +4751,7 @@ var Twig = (function (Twig) {
             if (params && params[0]) {
                 join_str = params[0];
             }
-            if (value instanceof Array) {
+            if (is("Array", value)) {
                 output = value;
             } else {
                 keyset = value._keys || Object.keys(value);
@@ -4515,21 +4789,21 @@ var Twig = (function (Twig) {
                 keyset = [];
 
             // Check to see if all the objects being merged are arrays
-            if (!(value instanceof Array)) {
+            if (!is("Array", value)) {
                 // Create obj as an Object
                 obj = { };
             } else {
                 Twig.forEach(params, function(param) {
-                    if (!(param instanceof Array)) {
+                    if (!is("Array", param)) {
                         obj = { };
                     }
                 });
             }
-            if (!(obj instanceof Array)) {
+            if (!is("Array", obj)) {
                 obj._keys = [];
             }
 
-            if (value instanceof Array) {
+            if (is("Array", value)) {
                 Twig.forEach(value, function(val) {
                     if (obj._keys) obj._keys.push(arr_index);
                     obj[arr_index] = val;
@@ -4557,7 +4831,7 @@ var Twig = (function (Twig) {
 
             // mixin the merge arrays
             Twig.forEach(params, function(param) {
-                if (param instanceof Array) {
+                if (is("Array", param)) {
                     Twig.forEach(param, function(val) {
                         if (obj._keys) obj._keys.push(arr_index);
                         obj[arr_index] = val;
@@ -4583,12 +4857,9 @@ var Twig = (function (Twig) {
             return obj;
         },
         date: function(value, params) {
-            if (value === undefined||value === null){
-                return;
-            }
-
             var date = Twig.functions.date(value);
-            return Twig.lib.formatDate(date, params[0]);
+            var format = params && params.length ? params[0] : 'F j, Y H:i';
+            return Twig.lib.formatDate(date, format);
         },
 
         date_modify: function(value, params) {
@@ -4674,7 +4945,9 @@ var Twig = (function (Twig) {
                         .replace(/\r/g, br)
                         .replace(/\n/g, br);
 
-            return Twig.lib.replaceAll(value, linebreak_tag, "\n");
+            value = Twig.lib.replaceAll(value, linebreak_tag, "\n");
+
+            return Twig.Markup(value);
         },
 
         /**
@@ -4803,9 +5076,9 @@ var Twig = (function (Twig) {
         },
 
         first: function(value) {
-            if (value instanceof Array) {
+            if (is("Array", value)) {
                 return value[0];
-            } else if (value instanceof Object) {
+            } else if (is("Object", value)) {
                 if ('_keys' in value) {
                     return value[value._keys[0]];
                 }
@@ -5033,19 +5306,19 @@ var Twig = (function (Twig) {
         },
         dump: function() {
             var EOL = '\n',
-            	indentChar = '  ',
-            	indentTimes = 0,
-            	out = '',
-				args = Array.prototype.slice.call(arguments),
-				indent = function(times) {
-                	var ind	 = '';
+                indentChar = '  ',
+                indentTimes = 0,
+                out = '',
+                args = Array.prototype.slice.call(arguments),
+                indent = function(times) {
+                    var ind  = '';
                     while (times > 0) {
                         times--;
                         ind += indentChar;
                     }
                     return ind;
                 },
-				displayVar = function(variable) {
+                displayVar = function(variable) {
                     out += indent(indentTimes);
                     if (typeof(variable) === 'object') {
                         dumpVar(variable);
@@ -5059,41 +5332,41 @@ var Twig = (function (Twig) {
                         out += 'bool(' + variable + ')' + EOL;
                     }
                 },
-             	dumpVar = function(variable) {
-					var	i;
-	                if (variable === null) {
-	                    out += 'NULL' + EOL;
-	                } else if (variable === undefined) {
-	                    out += 'undefined' + EOL;
-	                } else if (typeof variable === 'object') {
-	                    out += indent(indentTimes) + typeof(variable);
-	                    indentTimes++;
-	                    out += '(' + (function(obj) {
-	                        var size = 0, key;
-	                        for (key in obj) {
-	                            if (obj.hasOwnProperty(key)) {
-	                                size++;
-	                            }
-	                        }
-	                        return size;
-	                    })(variable) + ') {' + EOL;
-	                    for (i in variable) {
-	                        out += indent(indentTimes) + '[' + i + ']=> ' + EOL;
-	                        displayVar(variable[i]);
-	                    }
-	                    indentTimes--;
-	                    out += indent(indentTimes) + '}' + EOL;
-	                } else {
-	                    displayVar(variable);
-	                }
-	            };
+                dumpVar = function(variable) {
+                    var i;
+                    if (variable === null) {
+                        out += 'NULL' + EOL;
+                    } else if (variable === undefined) {
+                        out += 'undefined' + EOL;
+                    } else if (typeof variable === 'object') {
+                        out += indent(indentTimes) + typeof(variable);
+                        indentTimes++;
+                        out += '(' + (function(obj) {
+                            var size = 0, key;
+                            for (key in obj) {
+                                if (obj.hasOwnProperty(key)) {
+                                    size++;
+                                }
+                            }
+                            return size;
+                        })(variable) + ') {' + EOL;
+                        for (i in variable) {
+                            out += indent(indentTimes) + '[' + i + ']=> ' + EOL;
+                            displayVar(variable[i]);
+                        }
+                        indentTimes--;
+                        out += indent(indentTimes) + '}' + EOL;
+                    } else {
+                        displayVar(variable);
+                    }
+                };
 
-			// handle no argument case by dumping the entire render context
-			if (args.length == 0) args.push(this.context);
+            // handle no argument case by dumping the entire render context
+            if (args.length == 0) args.push(this.context);
 
-			Twig.forEach(args, function(variable) {
-				dumpVar(variable);
-			});
+            Twig.forEach(args, function(variable) {
+                dumpVar(variable);
+            });
 
             return out;
         },
@@ -5121,7 +5394,7 @@ var Twig = (function (Twig) {
             return Twig.placeholders.parent;
         },
         attribute: function(object, method, params) {
-            if (object instanceof Object) {
+            if (Twig.lib.is('Object', object)) {
                 if (object.hasOwnProperty(method)) {
                     if (typeof object[method] === "function") {
                         return object[method].apply(undefined, params);
@@ -5133,6 +5406,22 @@ var Twig = (function (Twig) {
             }
             // Array will return element 0-index
             return object[method] || undefined;
+        },
+        max: function(values) {
+            if(Twig.lib.is("Object", values)) {
+                delete values["_keys"];
+                return Twig.lib.max(values);
+            }
+
+            return Twig.lib.max.apply(null, arguments);
+        },
+        min: function(values) {
+            if(Twig.lib.is("Object", values)) {
+                delete values["_keys"];
+                return Twig.lib.min(values);
+            }
+
+            return Twig.lib.min.apply(null, arguments);
         },
         template_from_string: function(template) {
             if (template === undefined) {
