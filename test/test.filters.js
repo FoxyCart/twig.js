@@ -243,7 +243,13 @@ describe("Twig.js Filters ->", function() {
 
         it("should handle undefined", function() {
             var test_template = twig({data: '{{ undef|date("d/m/Y @ H:i:s") }}' });
-            test_template.render().should.equal( "" );
+            var date = new Date();
+            test_template.render().should.equal(stringDate(date));
+        });
+
+        it("should work with no parameters", function() {
+            var test_template = twig({data: '{{ 27571323556|date }}' });
+            test_template.render().should.equal(twig({data: '{{ 27571323556|date("F j, Y H:i") }}'}).render());
         });
     });
 
@@ -366,6 +372,15 @@ describe("Twig.js Filters ->", function() {
         it("should handle undefined", function() {
             var test_template = twig({data: '{{ undef|nl2br }}' });
             test_template.render().should.equal("" );
+        });
+
+        it("should not escape br tags if autoescape is on", function() {
+            twig({
+                autoescape: true,
+                data: '{{ test|nl2br }}'
+            }).render({
+                test: '<test>Line 1\nLine2</test>'
+            }).should.equal("&lt;test&gt;Line 1<br />\nLine2&lt;/test&gt;");
         });
     });
 

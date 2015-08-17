@@ -291,20 +291,20 @@ var Twig = (function (Twig) {
                     };
 
 
-                if (result instanceof Array) {
+                if (Twig.lib.is('Array', result)) {
                     len = result.length;
                     Twig.forEach(result, function (value) {
                         var key = index;
 
                         loop(key, value);
                     });
-                } else if (result instanceof Object) {
+                } else if (Twig.lib.is('Object', result)) {
                     if (result._keys !== undefined) {
                         keyset = result._keys;
                     } else {
                         keyset = Object.keys(result);
                     }
-					len = keyset.length;
+                    len = keyset.length;
                     Twig.forEach(keyset, function(key) {
                         // Ignore the _keys property, it's internal to twig.js
                         if (key === "_keys") return;
@@ -1015,10 +1015,6 @@ var Twig = (function (Twig) {
 
         if (!definition.type) {
             throw new Twig.Error("Unable to extend logic definition. No type provided for " + definition);
-        }
-        if (Twig.logic.type[definition.type]) {
-            throw new Twig.Error("Unable to extend logic definitions. Type " +
-                                 definition.type + " is already defined.");
         } else {
             Twig.logic.extendType(definition.type);
         }
