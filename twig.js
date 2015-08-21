@@ -1,5 +1,5 @@
 /**
- * Twig.js 0.8.2-1
+ * Twig.js 0.8.2-2
  *
  * @copyright 2011-2015 John Roepke and the Twig.js Contributors
  * @license   Available under the BSD 2-Clause License
@@ -8,7 +8,7 @@
 
 var Twig = (function (Twig) {
 
-    Twig.VERSION = "0.8.2-1";
+    Twig.VERSION = "0.8.2-2";
 
     return Twig;
 })(Twig || {});
@@ -3533,12 +3533,13 @@ var Twig = (function (Twig) {
         {
             type: Twig.expression.type.operator.binary,
             // Match any of +, *, /, -, %, ~, <, <=, >, >=, !=, ==, **, ?, :, and, or, not
-            regex: /(^[\+\-~%\?\:]|^[!=]==?|^[!<>]=?|^\*\*?|^\/\/?|^and\s+|^or\s+|^in\s+|^not in\s+|^\.\.)/,
+            regex: /(^[\+\-~%\?\:]|^[!=]==?|^[!<>]=?|^\*\*?|^\/\/?|^and\s+|^or\s+|^in\s+|^not in\s+|^\.\.|^starts\s+with\s+|^ends\s+with\s+|^matches\s+)/,
             next: Twig.expression.set.expressions.concat([Twig.expression.type.operator.unary]),
             compile: function(token, stack, output) {
                 delete token.match;
 
                 token.value = token.value.trim();
+                token.value = token.value.replace(/\s+/, ' ');
                 var value = token.value,
                     operator = Twig.expression.operator.lookup(value, token);
 
@@ -3548,10 +3549,10 @@ var Twig = (function (Twig) {
                        (stack[stack.length-1].type == Twig.expression.type.operator.unary || stack[stack.length-1].type == Twig.expression.type.operator.binary) &&
                             (
                                 (operator.associativity === Twig.expression.operator.leftToRight &&
-                                 operator.precidence    >= stack[stack.length-1].precidence) ||
+                                 operator.precedence    <= stack[stack.length-1].precedence) ||
 
                                 (operator.associativity === Twig.expression.operator.rightToLeft &&
-                                 operator.precidence    >  stack[stack.length-1].precidence)
+                                 operator.precedence    <  stack[stack.length-1].precedence)
                             )
                        ) {
                      var temp = stack.pop();
@@ -3610,10 +3611,10 @@ var Twig = (function (Twig) {
                        (stack[stack.length-1].type == Twig.expression.type.operator.unary || stack[stack.length-1].type == Twig.expression.type.operator.binary) &&
                             (
                                 (operator.associativity === Twig.expression.operator.leftToRight &&
-                                 operator.precidence    >= stack[stack.length-1].precidence) ||
+                                 operator.precedence    <= stack[stack.length-1].precedence) ||
 
                                 (operator.associativity === Twig.expression.operator.rightToLeft &&
-                                 operator.precidence    >  stack[stack.length-1].precidence)
+                                 operator.precedence    <  stack[stack.length-1].precedence)
                             )
                        ) {
                      var temp = stack.pop();
@@ -4383,73 +4384,87 @@ var Twig = (function (Twig) {
     };
 
     /**
-     * Get the precidence and associativity of an operator. These follow the order that C/C++ use.
-     * See http://en.wikipedia.org/wiki/Operators_in_C_and_C++ for the table of values.
+     * Get the precedence and associativity of an operator. These inherit the order from Twig.php.
+     * See https://github.com/twigphp/Twig/blob/1.x/lib/Twig/Extension/Core.php for the table of precedence.
      */
     Twig.expression.operator.lookup = function (operator, token) {
         switch (operator) {
             case "..":
+                token.precedence = 25;
+                token.associativity = Twig.expression.operator.leftToRight;
+                break;
+
             case 'not in':
             case 'in':
-                token.precidence = 20;
+                token.precedence = 20;
                 token.associativity = Twig.expression.operator.leftToRight;
                 break;
 
             case ',':
-                token.precidence = 18;
+                token.precedence = 18;
                 token.associativity = Twig.expression.operator.leftToRight;
                 break;
 
             // Ternary
             case '?':
             case ':':
-                token.precidence = 16;
+                token.precedence = 16;
                 token.associativity = Twig.expression.operator.rightToLeft;
                 break;
 
+            case 'starts with':
+            case 'ends with':
+            case 'matches':
+                token.precedence = 20;
+                token.associativity = Twig.expression.operator.leftToRight;
+                break;
+
             case 'or':
-                token.precidence = 14;
+                token.precedence = 10;
                 token.associativity = Twig.expression.operator.leftToRight;
                 break;
 
             case 'and':
-                token.precidence = 13;
+                token.precedence = 15;
                 token.associativity = Twig.expression.operator.leftToRight;
                 break;
 
             case '==':
             case '!=':
-                token.precidence = 9;
-                token.associativity = Twig.expression.operator.leftToRight;
-                break;
-
             case '<':
             case '<=':
             case '>':
             case '>=':
-                token.precidence = 8;
+                token.precedence = 20;
                 token.associativity = Twig.expression.operator.leftToRight;
                 break;
 
+            case '~': // String concatenation
+                token.precedence = 40;
+                token.associativity = Twig.expression.operator.leftToRight;
+                break;
 
-            case '~': // String concatination
             case '+':
             case '-':
-                token.precidence = 6;
+                token.precedence = 30;
                 token.associativity = Twig.expression.operator.leftToRight;
+                break;
+
+            case '**':
+                token.precedence = 200;
+                token.associativity = Twig.expression.operator.rightToLeft;
                 break;
 
             case '//':
-            case '**':
             case '*':
             case '/':
             case '%':
-                token.precidence = 5;
+                token.precedence = 60;
                 token.associativity = Twig.expression.operator.leftToRight;
                 break;
 
             case 'not':
-                token.precidence = 3;
+                token.precedence = 50;
                 token.associativity = Twig.expression.operator.rightToLeft;
                 break;
 
@@ -4615,6 +4630,49 @@ var Twig = (function (Twig) {
                 b = stack.pop();
                 a = stack.pop();
                 stack.push( Twig.functions.range(a, b) );
+                break;
+
+            case 'starts with':
+                b = stack.pop();
+                a = stack.pop();
+                stack.push(Twig.lib.is('String', a)
+                    && Twig.lib.is('String', b)
+                    && a.indexOf(b) === 0);
+                break;
+
+            case 'ends with':
+                b = stack.pop();
+                a = stack.pop();
+                stack.push(Twig.lib.is('String', a)
+                    && Twig.lib.is('String', b)
+                    && (b === '' || a.substr(-b.length) === b));
+                break;
+
+            case 'matches':
+                b = stack.pop();
+                a = stack.pop();
+
+                // TODO: remove this block when
+                // we start casting to string the PHP way:
+                // true => '1'
+                // null, undefined, false => ''
+                if (a == null || a === 0 || a === false) {
+                    a = '';
+                } else if (a === true) {
+                    a = '1';
+                }
+
+                // PHP supports different delimiters
+                // We need to care of quoted chars
+                var delimiter = b[0];
+                var parts = b.split(delimiter);
+                var flags = parts.pop();
+                parts.shift();
+                var pattern = parts.join(delimiter);
+                pattern = pattern.replace('\\'+delimiter, delimiter);
+                var regexp = new RegExp(pattern, flags);
+
+                stack.push(regexp.exec(a));
                 break;
 
             default:
