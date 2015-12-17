@@ -332,5 +332,14 @@ describe("Twig.js Expressions ->", function() {
             twig({data: "{{ 'fo#o' matches '#O\##i' ? 'OK' : 'KO' }}"}).render().should.equal('OK');
             twig({data: "{{ 'http://example.com' matches '/^http:\/\//' ? 'OK' : 'KO' }}"}).render().should.equal('OK');
         });
+
+        it("should support expressions as object keys", function() {
+            var test_template;
+            test_template = twig({data: '{% set a = {(foo): "value"} %}{{ a.bar }}'});
+            test_template.render({foo: 'bar'}).should.equal('value');
+
+            test_template = twig({data: '{{ {(foo): "value"}.bar }}'});
+            test_template.render({foo: 'bar'}).should.equal('value');
+        });
     });
 });
