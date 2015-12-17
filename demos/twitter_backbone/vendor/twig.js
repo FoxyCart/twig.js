@@ -1,5 +1,5 @@
 /**
- * Twig.js 0.8.2-3
+ * Twig.js 0.8.2-4
  *
  * @copyright 2011-2015 John Roepke and the Twig.js Contributors
  * @license   Available under the BSD 2-Clause License
@@ -8,7 +8,7 @@
 
 var Twig = (function (Twig) {
 
-    Twig.VERSION = "0.8.2-3";
+    Twig.VERSION = "0.8.2-4";
 
     return Twig;
 })(Twig || {});
@@ -3572,7 +3572,9 @@ var Twig = (function (Twig) {
                                 key_token.type === Twig.expression.type.variable ||
                                 key_token.type === Twig.expression.type.number) {
                             token.key = key_token.value;
-
+                        } else if (key_token.type === Twig.expression.type.parameter.end &&
+                                key_token.expression) {
+                            token.params = key_token.params;
                         } else {
                             throw new Twig.Error("Unexpected value before ':' of " + key_token.type + " = " + key_token.value);
                         }
@@ -3588,6 +3590,11 @@ var Twig = (function (Twig) {
                 if (token.key) {
                     // handle ternary ':' operator
                     stack.push(token);
+                } else if (token.params) {
+                    // handle "{(expression):value}"
+                    token.key = Twig.expression.parse.apply(this, [token.params, context]);
+                    stack.push(token);
+                    delete(token.params);
                 } else {
                     Twig.expression.operator.parse(token.value, stack);
                 }
