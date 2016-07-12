@@ -8,7 +8,7 @@
 
 var Twig = (function (Twig) {
 
-    Twig.VERSION = "0.8.2-4";
+    Twig.VERSION = "0.8.2-5";
 
     return Twig;
 })(Twig || {});
@@ -716,6 +716,19 @@ var Twig = (function (Twig) {
             return null;
         }
         return Twig.Templates.registry[id];
+    };
+
+    /**
+     * Drop a previously saved template from the store.
+     *
+     * @param {string} id   The ID of the template to drop.
+     *
+     */
+    Twig.Templates.drop = function(id) {
+        if (!Twig.Templates.registry.hasOwnProperty(id)) {
+            return null;
+        }
+        delete Twig.Templates.registry[id];
     };
 
     /**
@@ -3141,7 +3154,51 @@ var Twig = (function (Twig) {
                 var innerContext = {},
                     withContext,
                     i,
-                    template;
+                    template,
+                    file,
+                    newBlockTokens = [],
+                    hashBlockTokens = {};
+
+                // this function collent only block tokens
+                function filterBlockTokens(token) {
+                    if (token.type == 'logic' && token.token.type == 'Twig.logic.type.block') {
+                        newBlockTokens.push(token);
+                    }
+                    if (token.token && token.token.output) {
+                        Twig.forEach(token.token.output, filterBlockTokens);
+                    }
+                }
+
+                function flattenBlockTokens(token) {
+                    if (token.type == 'logic' && token.token.type == 'Twig.logic.type.block') {
+                        hashBlockTokens[token.token.block] = token;
+                    }
+                    if (token.token && token.token.output) {
+                        Twig.forEach(token.token.output, function(token) {
+                            flattenBlockTokens(token);
+                        });
+                    }
+                }
+
+                function updateTokens(core, updated) {
+                    Twig.forEach(core, function(token, index, container) {
+                        if (token.type == 'logic' && token.token.type == 'Twig.logic.type.block' && updated.token.block == token.token.block) {
+                            container[index] = updated;
+                        } else if (token.token && token.token.output) {
+                            updateTokens(token.token.output, updated);
+                        }
+                    });
+                }
+
+                function replaceParentFunc(inToken) {
+                    Twig.forEach(inToken.token.output, function(token, index, container) {
+                        if (token.type == 'output' && token.stack.length > 0 && token.stack[0].type == 'Twig.expression.type._function' && token.stack[0].fn == 'parent') {
+                            container[index] = hashBlockTokens[inToken.token.block];
+                        } else if (token.token && token.token.output) {
+                            replaceParentFunc(token);
+                        }
+                    });
+                }
 
                 if (!token.only) {
                     for (i in context) {
@@ -3159,7 +3216,7 @@ var Twig = (function (Twig) {
                     }
                 }
 
-                var file = Twig.expression.parse.apply(this, [token.stack, innerContext]);
+                file = Twig.expression.parse.apply(this, [token.stack, innerContext]);
 
                 if (file instanceof Twig.Template) {
                     template = file;
@@ -3167,17 +3224,33 @@ var Twig = (function (Twig) {
                     // Import file
                     template = this.importFile(file);
                 }
+                Twig.Templates.drop(template.id);
 
                 // reset previous blocks
                 this.blocks = {};
 
-                // parse tokens. output will be not used
-                var output = Twig.parse.apply(this, [token.output, innerContext]);
+                // get only block tokens
+                Twig.forEach(token.output, function(token) {
+                    filterBlockTokens(token);
+                });
+                // get hash with all blocks
+                Twig.forEach(template.tokens, function(token) {
+                    flattenBlockTokens(token);
+                });
 
-                // render tempalte with blocks defined in embed block
+                // update all blocks in origin template
+                Twig.forEach(newBlockTokens, function(token) {
+                    replaceParentFunc(token);
+                    updateTokens(template.tokens, token);
+                });
+
+                // parse tokens. output will be not used
+                Twig.parse.apply(template, [token.output, innerContext]);
+
+                // render template with blocks defined in embed block
                 return {
                     chain: chain,
-                    output: template.render(innerContext, {'blocks':this.blocks})
+                    output: template.render(innerContext, {'blocks': this.blocks})
                 };
             }
         },
