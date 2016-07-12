@@ -1,6 +1,8 @@
 START
+{% set foo='new bar' %}
 {% embed "embed-base.twig" %}
 {% block header %}
+{{foo}}
 new header
 {% endblock %}
 {% endembed %}
@@ -24,6 +26,7 @@ new header
 {% embed "embed-base.twig" %}
 {% embed "embed-include.twig" %}
 {% block header %}
+{{foo}}
 Super cool new header
 {% endblock %}
 {% endembed %}
