@@ -1,7 +1,7 @@
 /**
- * Twig.js 0.8.2-4
+ * Twig.js 0.8.2-5
  *
- * @copyright 2011-2015 John Roepke and the Twig.js Contributors
+ * @copyright 2011-2016 John Roepke and the Twig.js Contributors
  * @license   Available under the BSD 2-Clause License
  * @link      https://github.com/justjohn/twig.js
  */
