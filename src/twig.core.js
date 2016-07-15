@@ -705,19 +705,6 @@ var Twig = (function (Twig) {
     };
 
     /**
-     * Drop a previously saved template from the store.
-     *
-     * @param {string} id   The ID of the template to drop.
-     *
-     */
-    Twig.Templates.drop = function(id) {
-        if (!Twig.Templates.registry.hasOwnProperty(id)) {
-            return null;
-        }
-        delete Twig.Templates.registry[id];
-    };
-
-    /**
      * Load a template from a remote location using AJAX and saves in with the given ID.
      *
      * Available parameters:
