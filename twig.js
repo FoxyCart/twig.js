@@ -719,19 +719,6 @@ var Twig = (function (Twig) {
     };
 
     /**
-     * Drop a previously saved template from the store.
-     *
-     * @param {string} id   The ID of the template to drop.
-     *
-     */
-    Twig.Templates.drop = function(id) {
-        if (!Twig.Templates.registry.hasOwnProperty(id)) {
-            return null;
-        }
-        delete Twig.Templates.registry[id];
-    };
-
-    /**
      * Load a template from a remote location using AJAX and saves in with the given ID.
      *
      * Available parameters:
@@ -3155,6 +3142,7 @@ var Twig = (function (Twig) {
                     withContext,
                     i,
                     template,
+                    cache,
                     file,
                     newBlockTokens = [],
                     hashBlockTokens = {};
@@ -3193,7 +3181,13 @@ var Twig = (function (Twig) {
                 function replaceParentFunc(inToken) {
                     Twig.forEach(inToken.token.output, function(token, index, container) {
                         if (token.type == 'output' && token.stack.length > 0 && token.stack[0].type == 'Twig.expression.type._function' && token.stack[0].fn == 'parent') {
-                            container[index] = hashBlockTokens[inToken.token.block];
+                            container[index] = {
+                                token: {
+                                    block: ((new Date().getTime()) + Math.random()).toString(),
+                                    type: "Twig.logic.type.block",
+                                    output:  hashBlockTokens[inToken.token.block].token.output
+                                },
+                                type: 'logic'};
                         } else if (token.token && token.token.output) {
                             replaceParentFunc(token);
                         }
@@ -3221,15 +3215,17 @@ var Twig = (function (Twig) {
                 if (file instanceof Twig.Template) {
                     template = file;
                 } else {
-                    // Import file
+                    // Import file without cache
+                    cache = Twig.cache;
+                    Twig.cache = false;
                     template = this.importFile(file);
+                    Twig.cache = cache;
                 }
-                Twig.Templates.drop(template.id);
 
                 // reset previous blocks
                 this.blocks = {};
 
-                // get only block tokens
+                //get only block tokens
                 Twig.forEach(token.output, function(token) {
                     filterBlockTokens(token);
                 });
