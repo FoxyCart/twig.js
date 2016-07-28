@@ -1,0 +1,11 @@
+START
+{% embed "embed-base.twig" %}
+{% block header %}
+new header
+{% block footer %}
+new footer
+{{ parent() }}
+{% endblock %}
+{% endblock %}
+{% endembed %}
+END

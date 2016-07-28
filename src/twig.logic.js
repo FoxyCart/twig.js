@@ -923,33 +923,19 @@ var Twig = (function (Twig) {
             },
             parse: function (token, context, chain) {
                 // Resolve filename
-                var innerContext = {},
-                    withContext,
-                    i,
-                    template,
-                    cache,
-                    file,
+                var withContext, i, template, file, result,
+                    origTokens, origBlocks,
+                    innerContext = {},
                     newBlockTokens = [],
-                    hashBlockTokens = {};
+                    tpmToken = JSON.parse(JSON.stringify(token));
 
-                // this function collent only block tokens
+                // this function collect only block tokens
                 function filterBlockTokens(token) {
                     if (token.type == 'logic' && token.token.type == 'Twig.logic.type.block') {
                         newBlockTokens.push(token);
                     }
                     if (token.token && token.token.output) {
                         Twig.forEach(token.token.output, filterBlockTokens);
-                    }
-                }
-
-                function flattenBlockTokens(token) {
-                    if (token.type == 'logic' && token.token.type == 'Twig.logic.type.block') {
-                        hashBlockTokens[token.token.block] = token;
-                    }
-                    if (token.token && token.token.output) {
-                        Twig.forEach(token.token.output, function(token) {
-                            flattenBlockTokens(token);
-                        });
                     }
                 }
 
@@ -963,31 +949,31 @@ var Twig = (function (Twig) {
                     });
                 }
 
-                function replaceParentFunc(inToken) {
+                function replaceParentFunc(inToken, parent) {
                     Twig.forEach(inToken.token.output, function(token, index, container) {
                         if (token.type == 'output' && token.stack.length > 0 && token.stack[0].type == 'Twig.expression.type._function' && token.stack[0].fn == 'parent') {
                             container[index] = {
-                                token: {
-                                    block: ((new Date().getTime()) + Math.random()).toString(),
-                                    type: "Twig.logic.type.block",
-                                    output:  hashBlockTokens[inToken.token.block].token.output
-                                },
-                                type: 'logic'};
+                                value: origBlocks.hasOwnProperty(parent.token.block) ? origBlocks[parent.token.block] : '',
+                                type: "raw",
+                            };
                         } else if (token.token && token.token.output) {
-                            replaceParentFunc(token);
+                            if (token.token && token.token.block) {
+                                parent = token;
+                            }
+                            replaceParentFunc(token, parent);
                         }
                     });
                 }
 
-                if (!token.only) {
+                if (!tpmToken.only) {
                     for (i in context) {
                         if (context.hasOwnProperty(i))
                             innerContext[i] = context[i];
                     }
                 }
 
-                if (token.withStack !== undefined) {
-                    withContext = Twig.expression.parse.apply(this, [token.withStack, context]);
+                if (tpmToken.withStack !== undefined) {
+                    withContext = Twig.expression.parse.apply(this, [tpmToken.withStack, context]);
 
                     for (i in withContext) {
                         if (withContext.hasOwnProperty(i))
@@ -995,44 +981,47 @@ var Twig = (function (Twig) {
                     }
                 }
 
-                file = Twig.expression.parse.apply(this, [token.stack, innerContext]);
+                file = Twig.expression.parse.apply(this, [tpmToken.stack, innerContext]);
 
                 if (file instanceof Twig.Template) {
                     template = file;
                 } else {
                     // Import file without cache
-                    cache = Twig.cache;
-                    Twig.cache = false;
                     template = this.importFile(file);
-                    Twig.cache = cache;
                 }
 
-                // reset previous blocks
-                this.blocks = {};
+                origTokens = JSON.parse(JSON.stringify(template.tokens));
 
-                //get only block tokens
-                Twig.forEach(token.output, function(token) {
+                template.render(innerContext);
+                origBlocks = template.blocks;
+
+                // reset originals rendersd blocks
+                template.reset();
+
+                // get only block tpmTokens
+                Twig.forEach(tpmToken.output, function(token) {
                     filterBlockTokens(token);
                 });
-                // get hash with all blocks
-                Twig.forEach(template.tokens, function(token) {
-                    flattenBlockTokens(token);
-                });
 
-                // update all blocks in origin template
+                // update blocks in origin template
                 Twig.forEach(newBlockTokens, function(token) {
-                    replaceParentFunc(token);
+                    replaceParentFunc(token, token);
                     updateTokens(template.tokens, token);
                 });
 
                 // parse tokens. output will be not used
-                Twig.parse.apply(template, [token.output, innerContext]);
+                Twig.parse.apply(template, [tpmToken.output, innerContext]);
 
                 // render template with blocks defined in embed block
-                return {
+                result = {
                     chain: chain,
-                    output: template.render(innerContext, {'blocks': this.blocks})
+                    output: template.render(innerContext, {'blocks': template.blocks})
                 };
+
+                template.tokens = origTokens;
+                template.reset();
+
+                return result;
             }
         },
         /* Add the {% endembed %} token
