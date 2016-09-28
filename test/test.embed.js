@@ -58,7 +58,7 @@ describe("Twig.js Embed ->", function() {
                                                                'END'].join('\n') );
     });
 
-    it("it should render embed when blocks with `parent` function nested ", function() {
+    it("it should render embed when blocks with `parent` function nested", function() {
         twig({
             id:   'embed3',
             path: 'test/templates/embed-nested-parent.twig',
@@ -74,6 +74,39 @@ describe("Twig.js Embed ->", function() {
                                                                'new footer',
                                                                'base footer',
                                                                '',
+                                                               'B',
+                                                               'END'].join('\n') );
+    });
+
+    it("it should use local data from updated block", function() {
+        twig({
+            id:   'embed4',
+            path: 'test/templates/embed-parent-local-variables.twig',
+            async: false
+        });
+        // Load the template
+        twig({ref: 'embed4'}).render({'foo': 'base foo'}).trim().should.equal( ['START',
+                                                               'A',
+                                                               'new foo',
+                                                               'base bar',
+                                                               'base header',
+                                                               '',
+                                                               'B',
+                                                               'END'].join('\n') );
+    });
+
+    it("it should not update local variables in blocks by the varables from the root of embed tag", function() {
+        twig({
+            id:   'embed5',
+            path: 'test/templates/embed-parent-local-variables2.twig',
+            async: false
+        });
+        // Load the template
+        twig({ref: 'embed5'}).render({'foo': 'base foo'}).trim().should.equal( ['START',
+                                                               'A',
+                                                               'base foo',
+                                                               'base bar',
+                                                               'base header',
                                                                'B',
                                                                'END'].join('\n') );
     });

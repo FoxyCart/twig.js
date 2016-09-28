@@ -927,6 +927,7 @@ var Twig = (function (Twig) {
                     origTokens, origBlocks,
                     innerContext = {},
                     newBlockTokens = [],
+                    filteredOutput = [],
                     tpmToken = JSON.parse(JSON.stringify(token));
 
                 // this function collect only block tokens
@@ -990,17 +991,25 @@ var Twig = (function (Twig) {
                     template = this.importFile(file);
                 }
 
+                //First stage, update local variables
+                Twig.parse.apply(template, [tpmToken.output, innerContext]);
+
                 origTokens = JSON.parse(JSON.stringify(template.tokens));
 
                 template.render(innerContext);
                 origBlocks = template.blocks;
 
-                // reset originals rendersd blocks
+                // reset originals rendered blocks
                 template.reset();
 
                 // get only block tpmTokens
                 Twig.forEach(tpmToken.output, function(token) {
                     filterBlockTokens(token);
+
+                    // Remove fobidden elements from the root of embed tag
+                    if (token.type != 'logic' || token.token.type != 'Twig.logic.type.set') {
+                        filteredOutput.push(token);
+                    }
                 });
 
                 // update blocks in origin template
@@ -1009,8 +1018,8 @@ var Twig = (function (Twig) {
                     updateTokens(template.tokens, token);
                 });
 
-                // parse tokens. output will be not used
-                Twig.parse.apply(template, [tpmToken.output, innerContext]);
+                // parse tokens. Output will be not used
+                Twig.parse.apply(template, [filteredOutput, innerContext]);
 
                 // render template with blocks defined in embed block
                 result = {

@@ -1,0 +1,8 @@
+START
+{% embed 'embed-base2.twig' %}
+{% block header %}
+{% set foo='new foo' %}
+{{ parent() }}
+{% endblock %}
+{% endembed %}
+END
