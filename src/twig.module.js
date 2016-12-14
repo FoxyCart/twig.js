@@ -16,7 +16,7 @@ if (typeof module !== 'undefined' && module.declare) {
         }
     });
 } else if (typeof define == 'function' && define.amd) {
-    define(function() {
+    define('twig', function() {
         return Twig.exports;
     });
 } else if (typeof module !== 'undefined' && module.exports) {
